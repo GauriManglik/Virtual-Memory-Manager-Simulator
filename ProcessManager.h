@@ -1,29 +1,29 @@
-#ifndef PROCESS_MANAGER_H
-#define PROCESS_MANAGER_H
-
-#include <vector>
+#pragma once
 #include <unordered_map>
+#include <vector>
 #include <iostream>
-#include "MemoryManager.h"
 
 struct PageTableEntry {
     int frameNumber;
     bool valid;
 };
 
+class MemoryManager;
+
 class ProcessManager {
-private:
-    std::unordered_map<int, std::vector<PageTableEntry>> pageTables;
-    int nextPid;
     MemoryManager& memoryManager;
+    int nextPid;
+    std::unordered_map<int, std::vector<PageTableEntry>> pageTables;
 
 public:
-    ProcessManager(MemoryManager& mm);
+    ProcessManager(MemoryManager &mm);
+
     int createProcess(int numPages);
     void deleteProcess(int pid);
+
     void accessPage(int pid, int pageNum);
+
     void printPageTable(int pid) const;
+
+    void invalidatePage(int pid, int pageNum);  // Called by MemoryManager on eviction
 };
-
-#endif
-

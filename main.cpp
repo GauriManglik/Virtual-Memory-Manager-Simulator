@@ -4,12 +4,20 @@
 
 int main() {
     int numFrames;
-    std::cout << "Enter total number of physical frames: " << std::flush;
-
+    std::cout << "Enter total number of physical frames: ";
     std::cin >> numFrames;
 
-    MemoryManager mm(numFrames);
+    std::cout << "Choose replacement policy:\n1. FIFO\n2. LRU\n3. LFU\nChoice: ";
+    int rpChoice;
+    std::cin >> rpChoice;
+
+    ReplacementPolicy policy = FIFO;
+    if (rpChoice == 2) policy = LRU;
+    else if (rpChoice == 3) policy = LFU;
+
+    MemoryManager mm(numFrames, policy);
     ProcessManager pm(mm);
+    mm.setProcessManager(&pm);
 
     int choice;
     do {
