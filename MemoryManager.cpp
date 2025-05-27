@@ -1,3 +1,4 @@
+#include <climits>
 #include "MemoryManager.h"
 #include "ProcessManager.h"
 
