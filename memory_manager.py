@@ -1,6 +1,129 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from memory_manager import MemoryManager, ReplacementPolicy
+from enum import Enum
+
+class ReplacementPolicy(Enum):
+    FIFO = "FIFO"
+    LRU = "LRU"
+    LFU = "LFU"
+
+class MemoryManager:
+    def __init__(self, num_frames, policy=ReplacementPolicy.FIFO):
+        self.num_frames = num_frames
+        self.policy = policy
+        self.frames = [-1] * num_frames  # -1 represents empty frame
+        self.frame_info = {}  # For LRU/LFU tracking
+        self.page_table = {}  # Maps (pid, page) -> frame_number
+        self.frame_to_page = {}  # Maps frame_number -> (pid, page)
+        self.total_accesses = 0
+        self.hits = 0
+        self.misses = 0
+        
+    def check_page_in_memory(self, pid, page):
+        key = (pid, page)
+        return self.page_table.get(key, -1)
+        
+    def allocate_frame(self, pid, page):
+        self.total_accesses += 1
+        key = (pid, page)
+        
+        # Check if page is already in memory
+        if key in self.page_table:
+            self.hits += 1
+            frame = self.page_table[key]
+            self._update_access_info(frame)
+            return frame
+            
+        # Page fault occurs
+        self.misses += 1
+        
+        # Find empty frame or choose victim
+        frame = self._find_empty_frame()
+        if frame is None:
+            frame = self._choose_victim()
+            
+        # Remove old page from mappings if frame was occupied
+        if frame in self.frame_to_page:
+            old_key = self.frame_to_page[frame]
+            del self.page_table[old_key]
+            
+        # Update mappings
+        self.page_table[key] = frame
+        self.frame_to_page[frame] = key
+        self.frames[frame] = page
+        self._update_access_info(frame)
+        
+        return frame
+        
+    def deallocate_frames(self, pid):
+        # Remove all pages belonging to the process
+        pages_to_remove = [(p, f) for (p, page), f in self.page_table.items() if p == pid]
+        for _, frame in pages_to_remove:
+            self.frames[frame] = -1
+            if frame in self.frame_info:
+                del self.frame_info[frame]
+                
+        # Clean up mappings
+        self.page_table = {k: v for k, v in self.page_table.items() if k[0] != pid}
+        self.frame_to_page = {k: v for k, v in self.frame_to_page.items() if v[0] != pid}
+        
+    def _find_empty_frame(self):
+        try:
+            return self.frames.index(-1)
+        except ValueError:
+            return None
+            
+    def _choose_victim(self):
+        if not self.frame_info:
+            return 0
+        if self.policy == ReplacementPolicy.FIFO:
+            return min(self.frame_info.items(), key=lambda x: x[1])[0]
+        elif self.policy == ReplacementPolicy.LRU:
+            return min(self.frame_info.items(), key=lambda x: x[1])[0]
+        elif self.policy == ReplacementPolicy.LFU:
+            return min(self.frame_info.items(), key=lambda x: x[1])[0]
+        return 0
+            
+    def _update_access_info(self, frame):
+        current_time = self.total_accesses
+        
+        if self.policy == ReplacementPolicy.FIFO:
+            if frame not in self.frame_info:
+                self.frame_info[frame] = current_time
+        elif self.policy == ReplacementPolicy.LRU:
+            self.frame_info[frame] = current_time
+        elif self.policy == ReplacementPolicy.LFU:
+            self.frame_info[frame] = self.frame_info.get(frame, 0) + 1
+            
+    def get_stats(self):
+        return {
+            'total': self.total_accesses,
+            'hits': self.hits,
+            'misses': self.misses,
+            'hit_rate': (self.hits / self.total_accesses * 100) if self.total_accesses > 0 else 0,
+            'miss_rate': (self.misses / self.total_accesses * 100) if self.total_accesses > 0 else 0
+        }
+        
+    def get_frames(self):
+        return self.frames.copy()
+        
+    def get_page_table(self, pid):
+        return {page: frame for (p, page), frame in self.page_table.items() if p == pid}
+        
+    def get_frame_table(self):
+        frame_table = []
+        for frame in range(self.num_frames):
+            if frame in self.frame_to_page:
+                pid, page = self.frame_to_page[frame]
+                frame_table.append((frame, pid, page))
+            else:
+                frame_table.append((frame, -1, -1))
+        return frame_table
+        
+    def reset_stats(self):
+        self.total_accesses = 0
+        self.hits = 0
+        self.misses = 0
 
 class MemoryManagerGUI:
     def __init__(self, root):
